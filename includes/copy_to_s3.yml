@@ -1,0 +1,39 @@
+
+#- name: create bucket in s3
+#  command: aws s3 mb s3://'{{ s3_bucket }}'
+  
+#- name: copy package to s3
+#  command: aws s3 cp build/{{ zip_name }} s3://'{{ s3_bucket }}'/'{{ zip_name }}'
+
+- name: Maek sure buck is present & enable bucket versioning
+  s3_bucket:
+    aws_access_key: '{{ aws_access_key }}'
+    aws_secret_key: '{{ aws_secret_key }}'
+    name: '{{ s3_bucket }}'
+    region: '{{ aws_region }}'
+    state: present
+    versioning: yes
+    
+- name: copy package to s3
+  aws_s3:
+    mode: put
+    src: build/{{ zip_name }}
+    region: '{{ aws_region }}'
+    bucket: '{{ s3_bucket }}'
+    object: '{{ zip_name }}'  # versioning on for bucket
+    
+- name: find the s3 version we just uploaded
+  command: >
+    aws s3api head-object
+      --region {{ aws_region }}
+      --bucket {{ s3_bucket }}
+      --key {{ zip_name }}
+  register: head_object_output
+
+- debug:
+    var: head_object_output
+    verbosity: 2
+
+- name: set s3_version_id
+  set_fact:
+    s3_version_id: '{{ (head_object_output.stdout|from_json)["VersionId"] }}'
